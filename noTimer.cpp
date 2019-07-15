@@ -8,19 +8,19 @@ i.e. keep slience when holding data*/
 
 #include "mbed.h"
 
-Serial pc(USBTX, USBRX);
+//Serial pc(USBTX, USBRX);
 AnalogIn raw(A0);
-AnalogOut aso_out(DAC0_OUT);
-PwmOut thr(A4);
+//AnalogOut aso_out(DAC0_OUT);
+//PwmOut thr(A4);
 DigitalOut indicator(A2);
-DigitalOut red(LED1);
-DigitalOut green(LED2);
+//DigitalOut red(LED1);
+//DigitalOut green(LED2);
 //DigitalOut blue(LED3);
 //Timer timer;
-Timer timer;
-Timeout timer3;
-Timeout timer1;
-Timeout timer2;
+//Timer timer;
+//Timeout timer3;
+//Timeout timer1;
+//Timeout timer2;
 
 Ticker Sampling;
 int update = 1;
@@ -29,7 +29,7 @@ int detected = 0;
 int begin, end;
 void hold(){
     hold_data = 0;
-    green = 1;
+//    green = 1;
 //    printf("hold finish!\n");
 }
 
@@ -40,7 +40,7 @@ void update_(){
 
 void detect(){
 
-    indicator = 0;
+//    indicator = 0;
     detected = 0;
     update = 1;
     hold_data = 0;
@@ -59,7 +59,6 @@ void detect(){
     int mean_buffer_size = 16;
     int mean_buffer_end = 0;
     float sum = 0;
-    float sum_thr = 0;
     float previous_demean = 0;
     float mean_buffer[16]; // a ring buffer
     
@@ -72,17 +71,18 @@ void detect(){
     float threshold = 0;
     
     float hold_time = 0.0005;
-    float update_period = 0.1;
+    float update_period = 0.01;
     float detected_time = 0.0005;
     
     void iter(){
         /*subtract mean*/
         sum=sum-mean_buffer[mean_buffer_end];
-
         
-         mean_buffer[mean_buffer_end] = raw.read(); //20us
+        indicator = 1;
+        mean_buffer[mean_buffer_end] = raw.read(); //20us
+        indicator = 0;
         
-        
+        indicator = 1;
         sum=sum+mean_buffer[mean_buffer_end]; //substract first item and add the new item. reduce computation by size/2
         float demean;
         if(mean_buffer_end == 0) 
@@ -94,63 +94,81 @@ void detect(){
             mean_buffer_end = 0;
         else 
             mean_buffer_end++;
-        /*ASO*/    
+        indicator = 0;
+        
+//        /*ASO*/
+        indicator = 1;    
         aso = 100*demean * ( demean - previous_demean );        
         previous_demean = demean;
-            
-       // /*Thresholding*/
+        indicator = 0;           
+//       // /*Thresholding*/
+        indicator = 1;
         if(!detected){
 //            indicator = 1;
             if(abs(aso) <= threshold){ //below threshold, not detected
                 if(abs(aso) > threshold/2){ // above subthreshold
                     hold_data = 1;
-                    green = 0;
-                    timer1.attach(&hold, hold_time);
+//                    green = 0;
+//                    timer1.attach(&hold, hold_time);
                 }
-                if(update&&!hold_data){ // update threshold 
+                if(update!=20&&!hold_data){ // update threshold                 
+
                     update=0;
 //                    thr_buffer_mean = 0;
 //                    for(int i = 0; i < thr_buffer_size; i++)  //9us
 //                        thr_buffer_mean+=thr_buffer[i];
 //                    thr_buffer_mean = thr_buffer_mean / 64;
-                    threshold = 25*thr_buffer_mean;
-                    timer2.attach(&update_, update_period);                
-                } 
-            }                  
+                    threshold = 20*thr_buffer_mean;
+
+
+//                    timer2.attach(&update_, update_period);                
+                }
+                else 
+                    update++; 
+            }               
             else{ // above threshold, detected
+//            indicator  = 1;
 //                red = 0;
-                indicator = 1;
-                green = 1;
+//                green = 1;
                 detected = 1;
                 hold_data = 1;
                 update = 0;
-                timer.start();
-                timer3.attach(&detect,detected_time);
+//                timer.start();
+//                timer3.attach(&detect,detected_time);
             }
         }
+        else{ 
+//            indicator = 0;
+            detected = 0;
+            update = 1;
+            hold_data = 0;
+        }
+//        indicator = 1;
         if(hold_data){
             float temp = thr_buffer_mean;
             thr_buffer_mean = (thr_buffer_mean*64 - thr_buffer[thr_buffer_end] + abs(thr_buffer_mean))/64;
-            thr_buffer[thr_buffer_end] = abs(temp); 
+            thr_buffer[thr_buffer_end] = abs(temp);
+            hold_data = 0; 
         }
         else{
             thr_buffer_mean = (thr_buffer_mean*64 - thr_buffer[thr_buffer_end] + abs(aso))/64;
             thr_buffer[thr_buffer_end] = abs(aso);
         }
+//        indicator = 0;
             
-        aso_out.write(aso); 
-        thr.write(threshold);
+//        aso_out.write(aso); 
+//        thr.write(threshold);
           
-        if(thr_buffer_end+1 == thr_buffer_size) // update thr buffer end
+        if(thr_buffer_end+1 == thr_buffer_size) // xupdate thr buffer end
             thr_buffer_end = 0;
         else
             thr_buffer_end++;
-        
-
+//        indicator = 0;
         }
+        
 int main(){
-    red = 1;
-    thr.period(0.0005); //pwm period
+//    red = 1;
+//    thr.period(0.0005); //pwm period
     
 //fill buffers
     for(int i = 0; i < mean_buffer_size; i++){
@@ -175,7 +193,7 @@ int main(){
             mean_buffer_end++;
         /*ASO*/    
         aso = 100*demean * ( demean - previous_demean );
-        aso_out.write(abs(aso));
+//        aso_out.write(abs(aso));
         thr_buffer[j] = aso;
         previous_demean = demean;
         thr_buffer_mean += thr_buffer[j];
@@ -183,9 +201,9 @@ int main(){
     }
     thr_buffer_mean = thr_buffer_mean / 64;
     threshold = 3 * abs(thr_buffer_mean); 
-    thr.write(threshold);
+//    thr.write(threshold);
 
-    Sampling.attach(&iter, 0.0004); // sample in every 0.4ms
+    Sampling.attach(&iter, 0.0005); // sample in every 0.4ms
     
     while(1){}
 }
